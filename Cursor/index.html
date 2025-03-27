@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Color Changing Button</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <button id="colorButton">Click Me!</button>
+
+    <script>
+        const button = document.getElementById('colorButton');
+        let isBlue = true;
+
+        button.addEventListener('click', () => {
+            if (isBlue) {
+                button.style.backgroundColor = 'red';
+            } else {
+                button.style.backgroundColor = 'blue';
+            }
+            isBlue = !isBlue;
+        });
+    </script>
+</body>
+</html> 

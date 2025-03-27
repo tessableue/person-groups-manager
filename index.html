@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Person Groups Manager</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <!-- dotenv -->
+    <script src="https://cdn.jsdelivr.net/npm/dotenv@16.0.3/dist/dotenv.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Person Groups Manager</h1>
+        
+        <!-- Auth Forms -->
+        <div id="auth-container">
+            <div id="login-form">
+                <h2>Login</h2>
+                <input type="email" id="login-email" placeholder="Email">
+                <input type="password" id="login-password" placeholder="Password">
+                <button onclick="login()">Login</button>
+                <p>Don't have an account? <a href="#" onclick="toggleAuth('register')">Register</a></p>
+            </div>
+            
+            <div id="register-form" class="hidden">
+                <h2>Register</h2>
+                <input type="email" id="register-email" placeholder="Email">
+                <input type="password" id="register-password" placeholder="Password">
+                <button onclick="register()">Register</button>
+                <p>Already have an account? <a href="#" onclick="toggleAuth('login')">Login</a></p>
+            </div>
+        </div>
+
+        <!-- Main App Container -->
+        <div id="app-container" class="hidden">
+            <div id="user-info">
+                <span id="user-email"></span>
+                <button onclick="logout()">Logout</button>
+            </div>
+
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab-button active" onclick="switchTab('people')">People</button>
+                <button class="tab-button" onclick="switchTab('groups')">Groups</button>
+                <button class="tab-button" onclick="switchTab('chat')">Chat</button>
+            </div>
+
+            <!-- People Tab -->
+            <div id="people-tab" class="tab-content">
+                <div class="add-person-form">
+                    <div class="form-group">
+                        <input type="text" id="person-name" placeholder="Enter person name">
+                        <input type="url" id="person-linkedin" placeholder="Enter LinkedIn URL">
+                        <input type="text" id="person-job-title" placeholder="Enter job title">
+                        <select id="person-industry">
+                            <option value="">Select Industry</option>
+                            <option value="Healthcare">Healthcare</option>
+                            <option value="Education">Education</option>
+                            <option value="Information Technology">Information Technology (IT)</option>
+                            <option value="Engineering">Engineering</option>
+                            <option value="Business and Finance">Business and Finance</option>
+                            <option value="Marketing and Sales">Marketing and Sales</option>
+                            <option value="Retail and Customer Service">Retail and Customer Service</option>
+                            <option value="Hospitality and Food Services">Hospitality and Food Services</option>
+                            <option value="Manufacturing and Production">Manufacturing and Production</option>
+                            <option value="Transportation and Logistics">Transportation and Logistics</option>
+                            <option value="Human Resources">Human Resources (HR)</option>
+                            <option value="Creative Arts and Design">Creative Arts and Design</option>
+                            <option value="Legal Services">Legal Services</option>
+                            <option value="Construction and Trades">Construction and Trades</option>
+                            <option value="Science and Research">Science and Research</option>
+                            <option value="Nonprofit and Social Services">Nonprofit and Social Services</option>
+                            <option value="Real Estate">Real Estate</option>
+                            <option value="Government and Public Administration">Government and Public Administration</option>
+                            <option value="Media and Communications">Media and Communications</option>
+                            <option value="Agriculture and Forestry">Agriculture and Forestry</option>
+                        </select>
+                    </div>
+                    <button onclick="addPerson()">Add Person</button>
+                </div>
+                <div class="industry-filters">
+                    <select id="industry-filter" onchange="filterByIndustry()">
+                        <option value="">All Industries</option>
+                        <option value="Healthcare">Healthcare</option>
+                        <option value="Education">Education</option>
+                        <option value="Information Technology">Information Technology (IT)</option>
+                        <option value="Engineering">Engineering</option>
+                        <option value="Business and Finance">Business and Finance</option>
+                        <option value="Marketing and Sales">Marketing and Sales</option>
+                        <option value="Retail and Customer Service">Retail and Customer Service</option>
+                        <option value="Hospitality and Food Services">Hospitality and Food Services</option>
+                        <option value="Manufacturing and Production">Manufacturing and Production</option>
+                        <option value="Transportation and Logistics">Transportation and Logistics</option>
+                        <option value="Human Resources">Human Resources (HR)</option>
+                        <option value="Creative Arts and Design">Creative Arts and Design</option>
+                        <option value="Legal Services">Legal Services</option>
+                        <option value="Construction and Trades">Construction and Trades</option>
+                        <option value="Science and Research">Science and Research</option>
+                        <option value="Nonprofit and Social Services">Nonprofit and Social Services</option>
+                        <option value="Real Estate">Real Estate</option>
+                        <option value="Government and Public Administration">Government and Public Administration</option>
+                        <option value="Media and Communications">Media and Communications</option>
+                        <option value="Agriculture and Forestry">Agriculture and Forestry</option>
+                    </select>
+                </div>
+                <div id="people-list" class="list-container"></div>
+            </div>
+
+            <!-- Groups Tab -->
+            <div id="groups-tab" class="tab-content hidden">
+                <div class="add-group-form">
+                    <input type="text" id="group-name" placeholder="Enter group name">
+                    <button onclick="addGroup()">Add Group</button>
+                </div>
+                <div id="groups-list" class="list-container"></div>
+            </div>
+
+            <!-- Chat Tab -->
+            <div id="chat-tab" class="tab-content hidden">
+                <div class="chat-filters">
+                    <select id="chat-industry-filter" onchange="filterChatUsers()">
+                        <option value="">All Industries</option>
+                        <option value="Healthcare">Healthcare</option>
+                        <option value="Education">Education</option>
+                        <option value="Information Technology">Information Technology (IT)</option>
+                        <option value="Engineering">Engineering</option>
+                        <option value="Business and Finance">Business and Finance</option>
+                        <option value="Marketing and Sales">Marketing and Sales</option>
+                        <option value="Retail and Customer Service">Retail and Customer Service</option>
+                        <option value="Hospitality and Food Services">Hospitality and Food Services</option>
+                        <option value="Manufacturing and Production">Manufacturing and Production</option>
+                        <option value="Transportation and Logistics">Transportation and Logistics</option>
+                        <option value="Human Resources">Human Resources (HR)</option>
+                        <option value="Creative Arts and Design">Creative Arts and Design</option>
+                        <option value="Legal Services">Legal Services</option>
+                        <option value="Construction and Trades">Construction and Trades</option>
+                        <option value="Science and Research">Science and Research</option>
+                        <option value="Nonprofit and Social Services">Nonprofit and Social Services</option>
+                        <option value="Real Estate">Real Estate</option>
+                        <option value="Government and Public Administration">Government and Public Administration</option>
+                        <option value="Media and Communications">Media and Communications</option>
+                        <option value="Agriculture and Forestry">Agriculture and Forestry</option>
+                    </select>
+                    <input type="text" id="chat-job-title-filter" placeholder="Filter by job title" oninput="filterChatUsers()">
+                </div>
+                <div class="chat-container">
+                    <div class="chat-users-list">
+                        <h3>Available Users</h3>
+                        <div id="chat-users" class="list-container"></div>
+                    </div>
+                    <div class="chat-messages-container">
+                        <div class="chat-header">
+                            <h3 id="chat-with-user">Select a user to chat with</h3>
+                        </div>
+                        <div id="chat-messages" class="chat-messages"></div>
+                        <div class="chat-input-container">
+                            <input type="text" id="chat-message-input" placeholder="Type your message..." disabled>
+                            <button onclick="sendMessage()" id="send-message-btn" disabled>Send</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Group Detail View -->
+            <div id="group-detail" class="hidden">
+                <div class="group-header">
+                    <button onclick="backToGroups()" class="back-button">← Back to Groups</button>
+                    <h2 id="group-title"></h2>
+                </div>
+                <div id="group-members" class="list-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Person Modal -->
+    <div id="person-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Add to Groups</h3>
+            <div id="available-groups"></div>
+            <button onclick="closeModal()">Close</button>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="script.js"></script>
+</body>
+</html> 
