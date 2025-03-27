@@ -31,12 +31,12 @@ A web application for managing people and groups with real-time chat functionali
      ```
    - Edit `.env` with your Firebase configuration values:
      ```
-     FIREBASE_API_KEY=your_api_key_here
-     FIREBASE_AUTH_DOMAIN=your_project_id.firebaseapp.com
-     FIREBASE_PROJECT_ID=your_project_id
-     FIREBASE_STORAGE_BUCKET=your_project_id.appspot.com
-     FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-     FIREBASE_APP_ID=your_app_id
+     FIREBASE_API_KEY=AIzaSyB-u358M-Qm3BJpu-2uuGR2hVb8HNOCpaQ
+     FIREBASE_AUTH_DOMAIN=person-groups-manager.firebaseapp.com
+     FIREBASE_PROJECT_ID=person-groups-manager
+     FIREBASE_STORAGE_BUCKET=person-groups-manager.appspot.com
+     FIREBASE_MESSAGING_SENDER_ID=1234567890
+     FIREBASE_APP_ID=1:1234567890:web:abcdef1234567890
      ```
 
 3. Set up Firebase:
