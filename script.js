@@ -2,7 +2,10 @@
 const firebaseConfig = window.firebaseConfig;
 
 // Initialize Firebase
-firebase.initializeApp(firebaseConfig);
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+
 const auth = firebase.auth();
 const db = firebase.firestore();
 
@@ -38,12 +41,18 @@ async function register() {
     const email = document.getElementById('register-email').value;
     const password = document.getElementById('register-password').value;
 
+    if (!email || !password) {
+        alert('Please enter both email and password');
+        return;
+    }
+
     try {
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         currentUser = userCredential.user;
         await saveUserData();
         showApp();
     } catch (error) {
+        console.error('Registration error:', error);
         alert('Registration failed: ' + error.message);
     }
 }
@@ -103,21 +112,55 @@ function switchTab(tab) {
     document.getElementById(`${tab}-tab`).classList.remove('hidden');
 }
 
+// Add loading state helper function
+function setLoading(element, isLoading) {
+    if (isLoading) {
+        element.classList.add('loading');
+        element.disabled = true;
+    } else {
+        element.classList.remove('loading');
+        element.disabled = false;
+    }
+}
+
 // People Functions
 async function addPerson() {
     const nameInput = document.getElementById('person-name');
     const linkedinInput = document.getElementById('person-linkedin');
     const jobTitleInput = document.getElementById('person-job-title');
     const industryInput = document.getElementById('person-industry');
+    const addButton = document.querySelector('.add-person-form button');
     
     const name = nameInput.value.trim();
     const linkedin = linkedinInput.value.trim();
     const jobTitle = jobTitleInput.value.trim();
     const industry = industryInput.value;
     
-    if (!name) return;
+    // Validation
+    if (!name) {
+        alert('Please enter a name');
+        return;
+    }
+    
+    if (name.length > 100) {
+        alert('Name is too long (max 100 characters)');
+        return;
+    }
+    
+    if (linkedin && !linkedin.includes('linkedin.com')) {
+        alert('Please enter a valid LinkedIn URL');
+        return;
+    }
+    
+    if (jobTitle && jobTitle.length > 100) {
+        alert('Job title is too long (max 100 characters)');
+        return;
+    }
     
     try {
+        setLoading(addButton, true);
+        addButton.textContent = 'Adding...';
+        
         await db.collection('users').doc(currentUser.uid)
             .collection('people').add({
                 name: name,
@@ -126,13 +169,24 @@ async function addPerson() {
                 industry: industry || null,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
+            
+        // Clear form
         nameInput.value = '';
         linkedinInput.value = '';
         jobTitleInput.value = '';
         industryInput.value = '';
-        loadPeople();
+        
+        // Refresh list
+        await loadPeople();
+        
+        // Show success message
+        alert('Person added successfully!');
     } catch (error) {
         console.error('Error adding person:', error);
+        alert('Failed to add person. Please try again.');
+    } finally {
+        setLoading(addButton, false);
+        addButton.textContent = 'Add Person';
     }
 }
 
@@ -195,12 +249,26 @@ function filterByIndustry() {
 }
 
 async function deletePerson(personId) {
+    if (!confirm('Are you sure you want to delete this person? This action cannot be undone.')) {
+        return;
+    }
+    
+    const deleteButton = event.target;
     try {
+        setLoading(deleteButton, true);
+        deleteButton.textContent = 'Deleting...';
+        
         await db.collection('users').doc(currentUser.uid)
             .collection('people').doc(personId).delete();
-        loadPeople();
+            
+        await loadPeople();
+        alert('Person deleted successfully!');
     } catch (error) {
         console.error('Error deleting person:', error);
+        alert('Failed to delete person. Please try again.');
+    } finally {
+        setLoading(deleteButton, false);
+        deleteButton.textContent = 'Delete';
     }
 }
 
@@ -250,12 +318,30 @@ async function loadGroups() {
 }
 
 async function deleteGroup(groupId) {
+    if (!confirm('Are you sure you want to delete this group? This action cannot be undone.')) {
+        return;
+    }
+    
     try {
+        // Show loading state
+        const deleteButton = event.target;
+        const originalText = deleteButton.textContent;
+        deleteButton.textContent = 'Deleting...';
+        deleteButton.disabled = true;
+        
         await db.collection('users').doc(currentUser.uid)
             .collection('groups').doc(groupId).delete();
-        loadGroups();
+            
+        await loadGroups();
+        alert('Group deleted successfully!');
     } catch (error) {
         console.error('Error deleting group:', error);
+        alert('Failed to delete group. Please try again.');
+    } finally {
+        // Reset button state
+        const deleteButton = event.target;
+        deleteButton.textContent = originalText;
+        deleteButton.disabled = false;
     }
 }
 
@@ -382,10 +468,20 @@ async function saveUserData() {
     try {
         await db.collection('users').doc(currentUser.uid).set({
             email: currentUser.email,
+            displayName: currentUser.displayName || currentUser.email.split('@')[0],
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-        });
+        }, { merge: true });
+        
+        // Update the user's display name in Firebase Auth
+        if (!currentUser.displayName) {
+            await currentUser.updateProfile({
+                displayName: currentUser.email.split('@')[0]
+            });
+        }
     } catch (error) {
         console.error('Error saving user data:', error);
+        alert('Error saving user data. Please try again.');
     }
 }
 
@@ -395,10 +491,19 @@ async function loadUserData() {
     try {
         const doc = await db.collection('users').doc(currentUser.uid).get();
         if (doc.exists) {
-            // Load any additional user data if needed
+            const userData = doc.data();
+            // Update the UI with user data
+            userEmailElement.textContent = userData.email;
+            if (userData.displayName) {
+                document.getElementById('user-name').textContent = userData.displayName;
+            }
+        } else {
+            // If user data doesn't exist, create it
+            await saveUserData();
         }
     } catch (error) {
         console.error('Error loading user data:', error);
+        alert('Error loading user data. Please try again.');
     }
 }
 
@@ -498,6 +603,20 @@ async function loadChatMessages() {
     // Create chat room ID
     const chatRoomId = [currentUser.uid, currentChatUser.userId].sort().join('_');
     
+    // Mark messages as read
+    const unreadMessages = await db.collection('chats')
+        .doc(chatRoomId)
+        .collection('messages')
+        .where('read', '==', false)
+        .where('senderId', '!=', currentUser.uid)
+        .get();
+    
+    const batch = db.batch();
+    unreadMessages.forEach(doc => {
+        batch.update(doc.ref, { read: true });
+    });
+    await batch.commit();
+    
     // Listen for new messages
     chatListener = db.collection('chats')
         .doc(chatRoomId)
@@ -513,34 +632,86 @@ async function loadChatMessages() {
         });
 }
 
+// Update chat message display with read receipts
 function displayMessage(message) {
     const div = document.createElement('div');
     div.className = `chat-message ${message.senderId === currentUser.uid ? 'sent' : 'received'}`;
-    div.textContent = message.text;
+    
+    // Format timestamp
+    const timestamp = message.timestamp ? new Date(message.timestamp.toDate()).toLocaleTimeString() : '';
+    
+    // Add read receipt for sent messages
+    const readStatus = message.senderId === currentUser.uid 
+        ? `<div class="message-status ${message.read ? 'read' : 'sent'}">
+            ${message.read ? '✓✓' : '✓'}
+           </div>`
+        : '';
+    
+    div.innerHTML = `
+        <div class="message-content">${message.text}</div>
+        <div class="message-timestamp">${timestamp}</div>
+        ${readStatus}
+    `;
+    
     chatMessages.appendChild(div);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
+// Update sendMessage function to handle read receipts
 async function sendMessage() {
     if (!currentChatUser || !chatMessageInput.value.trim()) return;
     
     const messageText = chatMessageInput.value.trim();
+    if (messageText.length > 1000) {
+        alert('Message is too long (max 1000 characters)');
+        return;
+    }
+    
     const chatRoomId = [currentUser.uid, currentChatUser.userId].sort().join('_');
+    const sendButton = document.getElementById('send-message-btn');
     
     try {
-        await db.collection('chats')
+        setLoading(sendButton, true);
+        sendButton.textContent = 'Sending...';
+        
+        const messageRef = await db.collection('chats')
             .doc(chatRoomId)
             .collection('messages')
             .add({
                 text: messageText,
                 senderId: currentUser.uid,
                 senderName: currentUser.displayName || currentUser.email,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                read: false
+            });
+        
+        // Set up read receipt listener
+        db.collection('chats')
+            .doc(chatRoomId)
+            .collection('messages')
+            .doc(messageRef.id)
+            .onSnapshot(doc => {
+                if (doc.exists && doc.data().read) {
+                    // Update the message display to show read status
+                    const messageElement = chatMessages.querySelector(`[data-message-id="${messageRef.id}"]`);
+                    if (messageElement) {
+                        const statusElement = messageElement.querySelector('.message-status');
+                        if (statusElement) {
+                            statusElement.classList.remove('sent');
+                            statusElement.classList.add('read');
+                            statusElement.textContent = '✓✓';
+                        }
+                    }
+                }
             });
         
         chatMessageInput.value = '';
     } catch (error) {
         console.error('Error sending message:', error);
+        alert('Failed to send message. Please try again.');
+    } finally {
+        setLoading(sendButton, false);
+        sendButton.textContent = 'Send';
     }
 }
 
