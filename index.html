@@ -3,155 +3,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Professional Network</title>
+    <title>Person Groups Manager</title>
     <link rel="stylesheet" href="styles.css">
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
-    <!-- dotenv -->
-    <script src="https://cdn.jsdelivr.net/npm/dotenv@16.0.3/dist/dotenv.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js"></script>
+    <script src="config.js"></script>
 </head>
 <body>
     <!-- Auth Page -->
-    <div id="auth-container" class="container">
-        <h1>Professional Network</h1>
-        <div class="auth-form">
+    <div id="auth-page" class="page active">
+        <div id="auth-container">
+            <h2>Welcome to Person Groups Manager</h2>
             <div class="auth-tabs">
                 <button class="auth-tab active" onclick="toggleAuth('login')">Login</button>
                 <button class="auth-tab" onclick="toggleAuth('register')">Register</button>
             </div>
-            
-            <div id="login-form">
-                <input type="email" id="login-email" placeholder="Email">
-                <input type="password" id="login-password" placeholder="Password">
-                <button onclick="login()">Login</button>
-            </div>
-            
-            <div id="register-form" class="hidden">
-                <input type="email" id="register-email" placeholder="Email">
-                <input type="password" id="register-password" placeholder="Password">
-                <button onclick="register()">Register</button>
-            </div>
+            <form id="login-form" class="auth-form">
+                <input type="email" id="login-email" placeholder="Email" required>
+                <input type="password" id="login-password" placeholder="Password" required>
+                <button type="button" onclick="login()">Login</button>
+            </form>
+            <form id="register-form" class="auth-form hidden">
+                <input type="email" id="register-email" placeholder="Email" required>
+                <input type="password" id="register-password" placeholder="Password" required>
+                <button type="button" onclick="register()">Register</button>
+            </form>
         </div>
     </div>
 
     <!-- Main App Container -->
     <div id="app-container" class="hidden">
-        <!-- Header -->
-        <header class="app-header">
-            <div class="header-content">
-                <h1>Professional Network</h1>
-                <div class="user-info">
-                    <span id="user-name"></span>
-                    <button onclick="logout()">Logout</button>
-                </div>
-            </div>
-        </header>
+        <!-- Navigation Tab -->
+        <nav class="nav-tabs">
+            <button class="nav-tab" onclick="showPage('categories-page')">Categories</button>
+            <button class="nav-tab" onclick="showPage('people-page')">People</button>
+            <button class="nav-tab" onclick="showPage('profile-page')">Profile</button>
+            <button class="nav-tab" onclick="showPage('chat-page')">Chat</button>
+            <button class="nav-tab logout" onclick="logout()">Logout</button>
+        </nav>
 
-        <!-- Main Content -->
-        <main class="app-content">
-            <!-- Categories Page -->
-            <div id="categories-page" class="page active">
+        <!-- Categories Page -->
+        <div id="categories-page" class="page">
+            <div class="app-content">
                 <h2>Job Categories</h2>
-                <div class="categories-grid">
-                    <div class="category-card" onclick="showCategory('Healthcare')">
-                        <h3>Healthcare</h3>
-                    </div>
-                    <div class="category-card" onclick="showCategory('Education')">
-                        <h3>Education</h3>
-                    </div>
-                    <div class="category-card" onclick="showCategory('Information Technology')">
-                        <h3>Information Technology</h3>
-                    </div>
-                    <div class="category-card" onclick="showCategory('Engineering')">
-                        <h3>Engineering</h3>
-                    </div>
-                    <div class="category-card" onclick="showCategory('Business and Finance')">
-                        <h3>Business and Finance</h3>
-                    </div>
-                    <div class="category-card" onclick="showCategory('Marketing and Sales')">
-                        <h3>Marketing and Sales</h3>
-                    </div>
-                </div>
+                <div class="categories-grid"></div>
             </div>
+        </div>
 
-            <!-- Category People Page -->
-            <div id="category-people-page" class="page hidden">
-                <div class="page-header">
-                    <button onclick="backToCategories()" class="back-button">← Back to Categories</button>
-                    <h2 id="category-title"></h2>
-                </div>
-                <div id="category-people-list" class="people-grid"></div>
+        <!-- People Page -->
+        <div id="people-page" class="page">
+            <div class="app-content">
+                <h2>People</h2>
+                <div class="people-grid"></div>
             </div>
+        </div>
 
-            <!-- Profile Page -->
-            <div id="profile-page" class="page hidden">
-                <div class="page-header">
-                    <button onclick="backToCategoryPeople()" class="back-button">← Back to People</button>
-                    <h2 id="profile-name"></h2>
-                </div>
+        <!-- Profile Page -->
+        <div id="profile-page" class="page">
+            <div class="app-content">
+                <h2>My Profile</h2>
                 <div class="profile-content">
-                    <div class="profile-info">
-                        <div class="profile-header">
-                            <img id="profile-picture" src="default-avatar.png" alt="Profile Picture">
-                            <div class="profile-details">
-                                <h3 id="profile-job-title"></h3>
-                                <p id="profile-industry"></p>
-                            </div>
-                        </div>
-                        <div class="profile-stats">
-                            <div class="stat">
-                                <span class="stat-number" id="profile-posts-count">0</span>
-                                <span class="stat-label">Posts</span>
-                            </div>
-                            <div class="stat">
-                                <span class="stat-number" id="profile-connections-count">0</span>
-                                <span class="stat-label">Connections</span>
-                            </div>
+                    <div class="profile-header">
+                        <img id="profile-picture" src="default-avatar.png" alt="Profile Picture">
+                        <div>
+                            <h3 id="profile-name"></h3>
+                            <p id="profile-job-title"></p>
+                            <p id="profile-industry"></p>
                         </div>
                     </div>
-
-                    <!-- Work Posts Feed -->
+                    <div class="profile-stats">
+                        <div class="stat">
+                            <span class="stat-number" id="posts-count">0</span>
+                            <span>Posts</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-number" id="connections-count">0</span>
+                            <span>Connections</span>
+                        </div>
+                    </div>
                     <div class="posts-feed">
                         <div class="post-upload">
-                            <input type="file" id="post-image-input" accept="image/*" class="hidden">
+                            <input type="file" id="post-image-input" accept="image/*">
                             <button onclick="document.getElementById('post-image-input').click()">Upload Work Photo</button>
                         </div>
                         <div id="posts-container"></div>
                     </div>
+                </div>
+            </div>
+        </div>
 
-                    <!-- Chat Section -->
-                    <div class="chat-section">
-                        <button onclick="toggleChat()" class="chat-toggle">Message</button>
-                        <div id="chat-container" class="hidden">
-                            <div class="chat-header">
-                                <h3>Chat with <span id="chat-with-name"></span></h3>
-                                <button onclick="toggleChat()" class="close-chat">×</button>
-                            </div>
-                            <div id="chat-messages" class="chat-messages"></div>
-                            <div class="chat-input-container">
-                                <input type="text" id="chat-message-input" placeholder="Type your message...">
-                                <button onclick="sendMessage()">Send</button>
-                            </div>
-                        </div>
+        <!-- Chat Page -->
+        <div id="chat-page" class="page">
+            <div class="app-content">
+                <h2>Chats</h2>
+                <div class="chat-list"></div>
+                <div id="chat-container" class="hidden">
+                    <div class="chat-header">
+                        <h3 id="chat-with-name"></h3>
+                        <button onclick="toggleChat()">Close</button>
+                    </div>
+                    <div id="chat-messages" class="chat-messages"></div>
+                    <div class="chat-input-container">
+                        <input type="text" id="chat-message-input" placeholder="Type a message...">
+                        <button onclick="sendMessage()">Send</button>
                     </div>
                 </div>
             </div>
-        </main>
-    </div>
-
-    <!-- Person Modal -->
-    <div id="person-modal" class="modal hidden">
-        <div class="modal-content">
-            <h3>Add to Groups</h3>
-            <div id="available-groups"></div>
-            <button onclick="closeModal()">Close</button>
         </div>
     </div>
 
-    <script src="config.js"></script>
     <script src="script.js"></script>
 </body>
 </html> 

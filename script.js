@@ -11,13 +11,12 @@ const db = firebase.firestore();
 const storage = firebase.storage();
 
 let currentUser = null;
-let selectedPerson = null;
 let currentChatUser = null;
 let chatListener = null;
 
 // DOM Elements
 const appContainer = document.getElementById('app-container');
-const authContainer = document.getElementById('auth-container');
+const authPage = document.getElementById('auth-page');
 const userEmailElement = document.getElementById('user-email');
 const userNameElement = document.getElementById('user-name');
 const peopleList = document.getElementById('people-list');
@@ -32,6 +31,39 @@ const chatMessages = document.getElementById('chat-messages');
 const chatMessageInput = document.getElementById('chat-message-input');
 const sendMessageBtn = document.getElementById('send-message-btn');
 const chatWithUser = document.getElementById('chat-with-user');
+
+// Navigation Functions
+function showPage(pageId) {
+    // Hide all pages
+    document.querySelectorAll('.page').forEach(page => {
+        page.classList.remove('active');
+    });
+    
+    // Show selected page
+    document.getElementById(pageId).classList.add('active');
+    
+    // Update navigation tabs
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    event.target.classList.add('active');
+    
+    // Load page content
+    switch(pageId) {
+        case 'categories-page':
+            loadCategories();
+            break;
+        case 'people-page':
+            loadAllPeople();
+            break;
+        case 'profile-page':
+            loadUserProfile();
+            break;
+        case 'chat-page':
+            loadChatList();
+            break;
+    }
+}
 
 // Auth Functions
 function toggleAuth(form) {
@@ -101,39 +133,14 @@ async function logout() {
 
 // UI Functions
 function showApp() {
-    authContainer.classList.add('hidden');
+    authPage.classList.add('hidden');
     appContainer.classList.remove('hidden');
-    userEmailElement.textContent = currentUser.email;
-    loadCategories();
+    showPage('categories-page');
 }
 
 function showAuth() {
-    authContainer.classList.remove('hidden');
+    authPage.classList.remove('hidden');
     appContainer.classList.add('hidden');
-}
-
-// Navigation Functions
-function showCategory(category) {
-    document.getElementById('categories-page').classList.remove('active');
-    document.getElementById('category-people-page').classList.add('active');
-    document.getElementById('category-title').textContent = category;
-    loadCategoryPeople(category);
-}
-
-function backToCategories() {
-    document.getElementById('category-people-page').classList.remove('active');
-    document.getElementById('categories-page').classList.add('active');
-}
-
-function showProfile(personId) {
-    document.getElementById('category-people-page').classList.remove('active');
-    document.getElementById('profile-page').classList.add('active');
-    loadProfile(personId);
-}
-
-function backToCategoryPeople() {
-    document.getElementById('profile-page').classList.remove('active');
-    document.getElementById('category-people-page').classList.add('active');
 }
 
 // Data Loading Functions
@@ -151,13 +158,10 @@ async function loadCategories() {
     `).join('');
 }
 
-async function loadCategoryPeople(category) {
+async function loadAllPeople() {
     try {
-        const snapshot = await db.collection('users')
-            .where('industry', '==', category)
-            .get();
-        
-        const peopleGrid = document.getElementById('category-people-list');
+        const snapshot = await db.collection('users').get();
+        const peopleGrid = document.querySelector('.people-grid');
         peopleGrid.innerHTML = '';
         
         snapshot.forEach(doc => {
@@ -173,57 +177,77 @@ async function loadCategoryPeople(category) {
             peopleGrid.appendChild(div);
         });
     } catch (error) {
-        console.error('Error loading category people:', error);
+        console.error('Error loading people:', error);
     }
 }
 
-async function loadProfile(personId) {
+async function loadUserProfile() {
+    if (!currentUser) return;
+    
     try {
-        const doc = await db.collection('users').doc(personId).get();
+        const doc = await db.collection('users').doc(currentUser.uid).get();
         if (!doc.exists) return;
         
-        const person = doc.data();
-        document.getElementById('profile-name').textContent = person.displayName;
-        document.getElementById('profile-job-title').textContent = person.jobTitle || '';
-        document.getElementById('profile-industry').textContent = person.industry || '';
-        document.getElementById('profile-picture').src = person.photoURL || 'default-avatar.png';
+        const userData = doc.data();
+        document.getElementById('profile-name').textContent = userData.displayName || currentUser.email;
+        document.getElementById('profile-job-title').textContent = userData.jobTitle || '';
+        document.getElementById('profile-industry').textContent = userData.industry || '';
+        document.getElementById('profile-picture').src = userData.photoURL || 'default-avatar.png';
+        
+        // Load posts count
+        const postsSnapshot = await db.collection('users')
+            .doc(currentUser.uid)
+            .collection('posts')
+            .get();
+        document.getElementById('posts-count').textContent = postsSnapshot.size;
+        
+        // Load connections count
+        const connectionsSnapshot = await db.collection('users')
+            .doc(currentUser.uid)
+            .collection('connections')
+            .get();
+        document.getElementById('connections-count').textContent = connectionsSnapshot.size;
         
         // Load posts
-        loadPosts(personId);
-        
-        // Set up chat
-        currentChatUser = { userId: personId, name: person.displayName };
-        document.getElementById('chat-with-name').textContent = person.displayName;
+        loadPosts(currentUser.uid);
     } catch (error) {
         console.error('Error loading profile:', error);
     }
 }
 
-async function loadPosts(personId) {
+async function loadChatList() {
+    if (!currentUser) return;
+    
     try {
+        const chatList = document.querySelector('.chat-list');
+        chatList.innerHTML = '';
+        
+        // Get all users except current user
         const snapshot = await db.collection('users')
-            .doc(personId)
-            .collection('posts')
-            .orderBy('timestamp', 'desc')
+            .where('uid', '!=', currentUser.uid)
             .get();
         
-        const postsContainer = document.getElementById('posts-container');
-        postsContainer.innerHTML = '';
-        
         snapshot.forEach(doc => {
-            const post = doc.data();
+            const user = doc.data();
             const div = document.createElement('div');
-            div.className = 'post';
+            div.className = 'chat-item';
             div.innerHTML = `
-                <img src="${post.imageUrl}" alt="Work photo">
-                <p>${post.caption || ''}</p>
-                <small>${new Date(post.timestamp.toDate()).toLocaleDateString()}</small>
+                <h3>${user.displayName || user.email}</h3>
+                <p>${user.jobTitle || ''}</p>
             `;
-            postsContainer.appendChild(div);
+            div.onclick = () => startChat(doc.id, user.displayName || user.email);
+            chatList.appendChild(div);
         });
     } catch (error) {
-        console.error('Error loading posts:', error);
+        console.error('Error loading chat list:', error);
     }
+}
+
+async function startChat(userId, userName) {
+    currentChatUser = { userId, name: userName };
+    document.getElementById('chat-with-name').textContent = userName;
+    document.getElementById('chat-container').classList.remove('hidden');
+    await loadChatMessages();
 }
 
 // Post Functions
@@ -249,6 +273,33 @@ async function uploadPost(event) {
     } catch (error) {
         console.error('Error uploading post:', error);
         alert('Failed to upload post. Please try again.');
+    }
+}
+
+async function loadPosts(userId) {
+    try {
+        const snapshot = await db.collection('users')
+            .doc(userId)
+            .collection('posts')
+            .orderBy('timestamp', 'desc')
+            .get();
+        
+        const postsContainer = document.getElementById('posts-container');
+        postsContainer.innerHTML = '';
+        
+        snapshot.forEach(doc => {
+            const post = doc.data();
+            const div = document.createElement('div');
+            div.className = 'post';
+            div.innerHTML = `
+                <img src="${post.imageUrl}" alt="Work photo">
+                <p>${post.caption || ''}</p>
+                <small>${new Date(post.timestamp.toDate()).toLocaleDateString()}</small>
+            `;
+            postsContainer.appendChild(div);
+        });
+    } catch (error) {
+        console.error('Error loading posts:', error);
     }
 }
 
