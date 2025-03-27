@@ -8,6 +8,7 @@ if (!firebase.apps.length) {
 
 const auth = firebase.auth();
 const db = firebase.firestore();
+const storage = firebase.storage();
 
 let currentUser = null;
 let selectedPerson = null;
@@ -18,6 +19,7 @@ let chatListener = null;
 const appContainer = document.getElementById('app-container');
 const authContainer = document.getElementById('auth-container');
 const userEmailElement = document.getElementById('user-email');
+const userNameElement = document.getElementById('user-name');
 const peopleList = document.getElementById('people-list');
 const groupsList = document.getElementById('groups-list');
 const groupDetail = document.getElementById('group-detail');
@@ -33,6 +35,11 @@ const chatWithUser = document.getElementById('chat-with-user');
 
 // Auth Functions
 function toggleAuth(form) {
+    document.querySelectorAll('.auth-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    document.querySelector(`.auth-tab[onclick="toggleAuth('${form}')"]`).classList.add('active');
+    
     document.getElementById('login-form').classList.toggle('hidden', form === 'register');
     document.getElementById('register-form').classList.toggle('hidden', form === 'login');
 }
@@ -61,12 +68,18 @@ async function login() {
     const email = document.getElementById('login-email').value;
     const password = document.getElementById('login-password').value;
 
+    if (!email || !password) {
+        alert('Please enter both email and password');
+        return;
+    }
+
     try {
         const userCredential = await auth.signInWithEmailAndPassword(email, password);
         currentUser = userCredential.user;
         await loadUserData();
         showApp();
     } catch (error) {
+        console.error('Login error:', error);
         alert('Login failed: ' + error.message);
     }
 }
@@ -81,6 +94,7 @@ async function logout() {
         currentChatUser = null;
         showAuth();
     } catch (error) {
+        console.error('Logout error:', error);
         alert('Logout failed: ' + error.message);
     }
 }
@@ -90,9 +104,7 @@ function showApp() {
     authContainer.classList.add('hidden');
     appContainer.classList.remove('hidden');
     userEmailElement.textContent = currentUser.email;
-    loadPeople();
-    loadGroups();
-    loadChatUsers();
+    loadCategories();
 }
 
 function showAuth() {
@@ -100,28 +112,260 @@ function showAuth() {
     appContainer.classList.add('hidden');
 }
 
-function switchTab(tab) {
-    document.querySelectorAll('.tab-button').forEach(button => {
-        button.classList.remove('active');
-    });
-    document.querySelectorAll('.tab-content').forEach(content => {
-        content.classList.add('hidden');
-    });
-    
-    document.querySelector(`.tab-button[onclick="switchTab('${tab}')"]`).classList.add('active');
-    document.getElementById(`${tab}-tab`).classList.remove('hidden');
+// Navigation Functions
+function showCategory(category) {
+    document.getElementById('categories-page').classList.remove('active');
+    document.getElementById('category-people-page').classList.add('active');
+    document.getElementById('category-title').textContent = category;
+    loadCategoryPeople(category);
 }
 
-// Add loading state helper function
-function setLoading(element, isLoading) {
-    if (isLoading) {
-        element.classList.add('loading');
-        element.disabled = true;
-    } else {
-        element.classList.remove('loading');
-        element.disabled = false;
+function backToCategories() {
+    document.getElementById('category-people-page').classList.remove('active');
+    document.getElementById('categories-page').classList.add('active');
+}
+
+function showProfile(personId) {
+    document.getElementById('category-people-page').classList.remove('active');
+    document.getElementById('profile-page').classList.add('active');
+    loadProfile(personId);
+}
+
+function backToCategoryPeople() {
+    document.getElementById('profile-page').classList.remove('active');
+    document.getElementById('category-people-page').classList.add('active');
+}
+
+// Data Loading Functions
+async function loadCategories() {
+    const categories = [
+        'Healthcare', 'Education', 'Information Technology', 'Engineering',
+        'Business and Finance', 'Marketing and Sales'
+    ];
+    
+    const categoriesGrid = document.querySelector('.categories-grid');
+    categoriesGrid.innerHTML = categories.map(category => `
+        <div class="category-card" onclick="showCategory('${category}')">
+            <h3>${category}</h3>
+        </div>
+    `).join('');
+}
+
+async function loadCategoryPeople(category) {
+    try {
+        const snapshot = await db.collection('users')
+            .where('industry', '==', category)
+            .get();
+        
+        const peopleGrid = document.getElementById('category-people-list');
+        peopleGrid.innerHTML = '';
+        
+        snapshot.forEach(doc => {
+            const person = doc.data();
+            const div = document.createElement('div');
+            div.className = 'person-card';
+            div.innerHTML = `
+                <img src="${person.photoURL || 'default-avatar.png'}" alt="${person.displayName}">
+                <h3>${person.displayName}</h3>
+                <p>${person.jobTitle || ''}</p>
+            `;
+            div.onclick = () => showProfile(doc.id);
+            peopleGrid.appendChild(div);
+        });
+    } catch (error) {
+        console.error('Error loading category people:', error);
     }
 }
+
+async function loadProfile(personId) {
+    try {
+        const doc = await db.collection('users').doc(personId).get();
+        if (!doc.exists) return;
+        
+        const person = doc.data();
+        document.getElementById('profile-name').textContent = person.displayName;
+        document.getElementById('profile-job-title').textContent = person.jobTitle || '';
+        document.getElementById('profile-industry').textContent = person.industry || '';
+        document.getElementById('profile-picture').src = person.photoURL || 'default-avatar.png';
+        
+        // Load posts
+        loadPosts(personId);
+        
+        // Set up chat
+        currentChatUser = { userId: personId, name: person.displayName };
+        document.getElementById('chat-with-name').textContent = person.displayName;
+    } catch (error) {
+        console.error('Error loading profile:', error);
+    }
+}
+
+async function loadPosts(personId) {
+    try {
+        const snapshot = await db.collection('users')
+            .doc(personId)
+            .collection('posts')
+            .orderBy('timestamp', 'desc')
+            .get();
+        
+        const postsContainer = document.getElementById('posts-container');
+        postsContainer.innerHTML = '';
+        
+        snapshot.forEach(doc => {
+            const post = doc.data();
+            const div = document.createElement('div');
+            div.className = 'post';
+            div.innerHTML = `
+                <img src="${post.imageUrl}" alt="Work photo">
+                <p>${post.caption || ''}</p>
+                <small>${new Date(post.timestamp.toDate()).toLocaleDateString()}</small>
+            `;
+            postsContainer.appendChild(div);
+        });
+    } catch (error) {
+        console.error('Error loading posts:', error);
+    }
+}
+
+// Post Functions
+async function uploadPost(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    try {
+        const storageRef = storage.ref(`posts/${currentUser.uid}/${Date.now()}_${file.name}`);
+        await storageRef.put(file);
+        const imageUrl = await storageRef.getDownloadURL();
+        
+        await db.collection('users')
+            .doc(currentUser.uid)
+            .collection('posts')
+            .add({
+                imageUrl,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                caption: prompt('Add a caption to your post:') || ''
+            });
+        
+        loadPosts(currentUser.uid);
+    } catch (error) {
+        console.error('Error uploading post:', error);
+        alert('Failed to upload post. Please try again.');
+    }
+}
+
+// Chat Functions
+function toggleChat() {
+    const chatContainer = document.getElementById('chat-container');
+    chatContainer.classList.toggle('hidden');
+    if (!chatContainer.classList.contains('hidden')) {
+        loadChatMessages();
+    }
+}
+
+async function loadChatMessages() {
+    if (!currentChatUser) return;
+    
+    const chatRoomId = [currentUser.uid, currentChatUser.userId].sort().join('_');
+    
+    // Mark messages as read
+    const unreadMessages = await db.collection('chats')
+        .doc(chatRoomId)
+        .collection('messages')
+        .where('read', '==', false)
+        .where('senderId', '!=', currentUser.uid)
+        .get();
+    
+    const batch = db.batch();
+    unreadMessages.forEach(doc => {
+        batch.update(doc.ref, { read: true });
+    });
+    await batch.commit();
+    
+    // Listen for messages
+    if (chatListener) {
+        chatListener();
+    }
+    
+    chatListener = db.collection('chats')
+        .doc(chatRoomId)
+        .collection('messages')
+        .orderBy('timestamp', 'asc')
+        .onSnapshot(snapshot => {
+            const chatMessages = document.getElementById('chat-messages');
+            chatMessages.innerHTML = '';
+            
+            snapshot.forEach(doc => {
+                const message = doc.data();
+                displayMessage(message);
+            });
+        });
+}
+
+function displayMessage(message) {
+    const div = document.createElement('div');
+    div.className = `chat-message ${message.senderId === currentUser.uid ? 'sent' : 'received'}`;
+    
+    const timestamp = message.timestamp ? new Date(message.timestamp.toDate()).toLocaleTimeString() : '';
+    const readStatus = message.senderId === currentUser.uid 
+        ? `<div class="message-status ${message.read ? 'read' : 'sent'}">
+            ${message.read ? '✓✓' : '✓'}
+           </div>`
+        : '';
+    
+    div.innerHTML = `
+        <div class="message-content">${message.text}</div>
+        <div class="message-timestamp">${timestamp}</div>
+        ${readStatus}
+    `;
+    
+    const chatMessages = document.getElementById('chat-messages');
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+async function sendMessage() {
+    if (!currentChatUser || !chatMessageInput.value.trim()) return;
+    
+    const messageText = chatMessageInput.value.trim();
+    const chatRoomId = [currentUser.uid, currentChatUser.userId].sort().join('_');
+    
+    try {
+        await db.collection('chats')
+            .doc(chatRoomId)
+            .collection('messages')
+            .add({
+                text: messageText,
+                senderId: currentUser.uid,
+                senderName: currentUser.displayName || currentUser.email,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                read: false
+            });
+        
+        chatMessageInput.value = '';
+    } catch (error) {
+        console.error('Error sending message:', error);
+        alert('Failed to send message. Please try again.');
+    }
+}
+
+// Event Listeners
+document.getElementById('post-image-input').addEventListener('change', uploadPost);
+document.getElementById('chat-message-input').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        sendMessage();
+    }
+});
+
+// Auth State Observer
+auth.onAuthStateChanged((user) => {
+    if (user) {
+        currentUser = user;
+        loadUserData();
+        showApp();
+    } else {
+        currentUser = null;
+        showAuth();
+    }
+});
 
 // People Functions
 async function addPerson() {
@@ -507,17 +751,16 @@ async function loadUserData() {
     }
 }
 
-// Auth State Observer
-auth.onAuthStateChanged((user) => {
-    if (user) {
-        currentUser = user;
-        loadUserData();
-        showApp();
+// Add loading state helper function
+function setLoading(element, isLoading) {
+    if (isLoading) {
+        element.classList.add('loading');
+        element.disabled = true;
     } else {
-        currentUser = null;
-        showAuth();
+        element.classList.remove('loading');
+        element.disabled = false;
     }
-});
+}
 
 // Chat Functions
 async function loadChatUsers() {
@@ -587,49 +830,6 @@ function selectChatUser(userId, personId, name) {
     
     // Load messages
     loadChatMessages();
-}
-
-async function loadChatMessages() {
-    if (!currentChatUser) return;
-    
-    // Clear existing messages
-    chatMessages.innerHTML = '';
-    
-    // Remove existing listener if any
-    if (chatListener) {
-        chatListener();
-    }
-    
-    // Create chat room ID
-    const chatRoomId = [currentUser.uid, currentChatUser.userId].sort().join('_');
-    
-    // Mark messages as read
-    const unreadMessages = await db.collection('chats')
-        .doc(chatRoomId)
-        .collection('messages')
-        .where('read', '==', false)
-        .where('senderId', '!=', currentUser.uid)
-        .get();
-    
-    const batch = db.batch();
-    unreadMessages.forEach(doc => {
-        batch.update(doc.ref, { read: true });
-    });
-    await batch.commit();
-    
-    // Listen for new messages
-    chatListener = db.collection('chats')
-        .doc(chatRoomId)
-        .collection('messages')
-        .orderBy('timestamp', 'asc')
-        .onSnapshot(snapshot => {
-            snapshot.docChanges().forEach(change => {
-                if (change.type === 'added') {
-                    const message = change.doc.data();
-                    displayMessage(message);
-                }
-            });
-        });
 }
 
 // Update chat message display with read receipts
