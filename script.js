@@ -819,7 +819,7 @@ async function loadChatUsers() {
         const snapshot = await db.collection('users').get();
         chatUsers.innerHTML = '';
         
-        snapshot.forEach(doc => {
+        for (const doc of snapshot.docs) {
             if (doc.id !== currentUser.uid) {
                 const userData = doc.data();
                 const peopleSnapshot = await doc.ref.collection('people').get();
@@ -844,7 +844,7 @@ async function loadChatUsers() {
                     chatUsers.appendChild(div);
                 });
             }
-        });
+        }
     } catch (error) {
         console.error('Error loading chat users:', error);
     }
