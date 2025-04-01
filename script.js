@@ -76,6 +76,21 @@ function toggleAuth(form) {
     });
 }
 
+// Auth state observer
+auth.onAuthStateChanged((user) => {
+    if (user) {
+        currentUser = user;
+        showApp();
+        loadUserProfile();
+        loadCategories();
+        loadPeople();
+        loadChatUsers();
+    } else {
+        currentUser = null;
+        showAuth();
+    }
+});
+
 async function register() {
     try {
         const email = document.getElementById('register-email').value;
@@ -413,21 +428,6 @@ document.getElementById('post-image-input').addEventListener('change', uploadPos
 document.getElementById('chat-message-input').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
         sendMessage();
-    }
-});
-
-// Auth State Observer
-auth.onAuthStateChanged((user) => {
-    if (user) {
-        currentUser = user;
-        showApp();
-        loadUserProfile();
-        loadCategories();
-        loadPeople();
-        loadChatUsers();
-    } else {
-        currentUser = null;
-        showAuth();
     }
 });
 
