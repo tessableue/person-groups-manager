@@ -13,6 +13,8 @@ const storage = firebase.storage();
 let currentUser = null;
 let currentChatUser = null;
 let chatListener = null;
+let selectedChatUser = null;
+let selectedChatId = null;
 
 // DOM Elements
 const appContainer = document.getElementById('app-container');
@@ -67,80 +69,88 @@ function showPage(pageId) {
 
 // Auth Functions
 function toggleAuth(form) {
-    document.querySelectorAll('.auth-tab').forEach(tab => {
-        tab.classList.remove('active');
-    });
-    document.querySelector(`.auth-tab[onclick="toggleAuth('${form}')"]`).classList.add('active');
-    
     document.getElementById('login-form').classList.toggle('hidden', form === 'register');
     document.getElementById('register-form').classList.toggle('hidden', form === 'login');
+    document.querySelectorAll('.auth-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.textContent.toLowerCase() === form);
+    });
 }
 
 async function register() {
-    const email = document.getElementById('register-email').value;
-    const password = document.getElementById('register-password').value;
-
-    if (!email || !password) {
-        alert('Please enter both email and password');
-        return;
-    }
-
     try {
+        const email = document.getElementById('register-email').value;
+        const password = document.getElementById('register-password').value;
+
+        if (!email || !password) {
+            alert('Please fill in all fields');
+            return;
+        }
+
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-        currentUser = userCredential.user;
-        await saveUserData();
-        showApp();
+        const user = userCredential.user;
+
+        // Create initial user profile
+        await db.collection('users').doc(user.uid).set({
+            email: email,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Create initial person profile
+        await db.collection('users').doc(user.uid).collection('people').add({
+            name: email.split('@')[0], // Default name from email
+            jobTitle: '',
+            industry: '',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        alert('Registration successful!');
+        toggleAuth('login');
     } catch (error) {
         console.error('Registration error:', error);
-        alert('Registration failed: ' + error.message);
+        alert(error.message);
     }
 }
 
 async function login() {
-    const email = document.getElementById('login-email').value;
-    const password = document.getElementById('login-password').value;
-
-    if (!email || !password) {
-        alert('Please enter both email and password');
-        return;
-    }
-
     try {
-        const userCredential = await auth.signInWithEmailAndPassword(email, password);
-        currentUser = userCredential.user;
-        await loadUserData();
-        showApp();
+        const email = document.getElementById('login-email').value;
+        const password = document.getElementById('login-password').value;
+
+        if (!email || !password) {
+            alert('Please fill in all fields');
+            return;
+        }
+
+        await auth.signInWithEmailAndPassword(email, password);
+        alert('Login successful!');
     } catch (error) {
         console.error('Login error:', error);
-        alert('Login failed: ' + error.message);
+        alert(error.message);
     }
 }
 
 async function logout() {
     try {
-        if (chatListener) {
-            chatListener();
-        }
         await auth.signOut();
-        currentUser = null;
-        currentChatUser = null;
         showAuth();
     } catch (error) {
         console.error('Logout error:', error);
-        alert('Logout failed: ' + error.message);
+        alert(error.message);
     }
 }
 
 // UI Functions
 function showApp() {
-    authPage.classList.add('hidden');
-    appContainer.classList.remove('hidden');
+    document.getElementById('auth-page').classList.remove('active');
+    document.getElementById('app-container').classList.remove('hidden');
     showPage('categories-page');
 }
 
 function showAuth() {
-    authPage.classList.remove('hidden');
-    appContainer.classList.add('hidden');
+    document.getElementById('auth-page').classList.add('active');
+    document.getElementById('app-container').classList.add('hidden');
+    document.getElementById('login-form').classList.remove('hidden');
+    document.getElementById('register-form').classList.add('hidden');
 }
 
 // Data Loading Functions
@@ -410,8 +420,11 @@ document.getElementById('chat-message-input').addEventListener('keypress', (e) =
 auth.onAuthStateChanged((user) => {
     if (user) {
         currentUser = user;
-        loadUserData();
         showApp();
+        loadUserProfile();
+        loadCategories();
+        loadPeople();
+        loadChatUsers();
     } else {
         currentUser = null;
         showAuth();
