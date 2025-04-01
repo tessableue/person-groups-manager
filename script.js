@@ -101,24 +101,24 @@ async function register() {
             return;
         }
 
+        // Create user with email and password
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
 
-        // Create initial user profile
+        // Create user profile in Firestore
         await db.collection('users').doc(user.uid).set({
             email: email,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            displayName: email.split('@')[0],
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
         });
 
-        // Create initial person profile
-        await db.collection('users').doc(user.uid).collection('people').add({
-            name: email.split('@')[0], // Default name from email
-            jobTitle: '',
-            industry: '',
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        // Update user's display name in Firebase Auth
+        await user.updateProfile({
+            displayName: email.split('@')[0]
         });
 
-        alert('Registration successful!');
+        alert('Registration successful! Please log in.');
         toggleAuth('login');
     } catch (error) {
         console.error('Registration error:', error);
