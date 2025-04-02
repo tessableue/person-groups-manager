@@ -6,11 +6,21 @@
     <title>Person Groups Manager</title>
     <link rel="stylesheet" href="styles.css">
     <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-storage-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+    <!-- Initialize Firebase -->
     <script src="config.js"></script>
+    <script>
+        // Add error handling for Firebase initialization
+        window.addEventListener('load', function() {
+            if (typeof firebase === 'undefined') {
+                console.error('Firebase is not loaded!');
+                alert('Error: Firebase is not loaded. Please check your internet connection and try again.');
+            }
+        });
+    </script>
 </head>
 <body>
     <!-- Auth Page -->

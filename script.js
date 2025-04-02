@@ -93,36 +93,47 @@ auth.onAuthStateChanged((user) => {
 
 async function register() {
     try {
+        console.log('Starting registration process...');
         const email = document.getElementById('register-email').value;
         const password = document.getElementById('register-password').value;
 
+        console.log('Email:', email);
+        console.log('Password length:', password.length);
+
         if (!email || !password) {
+            console.error('Missing email or password');
             alert('Please fill in all fields');
             return;
         }
 
         // Create user with email and password
+        console.log('Creating user with Firebase Auth...');
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
+        console.log('User created successfully:', user.uid);
 
         // Create user profile in Firestore
+        console.log('Creating user profile in Firestore...');
         await db.collection('users').doc(user.uid).set({
             email: email,
             displayName: email.split('@')[0],
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
         });
+        console.log('User profile created successfully');
 
         // Update user's display name in Firebase Auth
+        console.log('Updating user display name...');
         await user.updateProfile({
             displayName: email.split('@')[0]
         });
+        console.log('Display name updated successfully');
 
         alert('Registration successful! Please log in.');
         toggleAuth('login');
     } catch (error) {
         console.error('Registration error:', error);
-        alert(error.message);
+        alert('Registration failed: ' + error.message);
     }
 }
 
